@@ -1,7 +1,7 @@
 # Exclude specific cache directories
 /descriptive_cache/
 /descriptive_files/
-/.quarto/
+/quarto/
 /Final-Report_cache/
 /Final-Report_files/
 /lasso/_lasso_files/
@@ -15,3 +15,8 @@
 *.png
 *.csv
 *.RData
+*.js
+*.json
+*.css
+__pycache__/
+/.quarto/
