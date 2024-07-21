@@ -1,0 +1,11 @@
+---
+title: "Analysis"
+subtitle: "Group 3"
+date: today
+author: Term Members
+format:
+  html: 
+   embed-resources: true
+toc: true
+bibliography: references.bib
+---

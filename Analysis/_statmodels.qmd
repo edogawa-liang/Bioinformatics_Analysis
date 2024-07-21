@@ -1,0 +1,160 @@
+```{r, include=FALSE}
+hooks = knitr::knit_hooks$get()
+hook_foldable = function(type) {
+  force(type)
+  function(x, options) {
+    res = hooks[[type]](x, options)
+    
+    if (isFALSE(options[[paste0("fold.", type)]])) return(res)
+    
+    paste0(
+      "<details><summary>", type, "</summary>\n\n",
+      res,
+      "\n\n</details>"
+    )
+  }
+}
+knitr::knit_hooks$set(
+  output = hook_foldable("output"),
+  plot = hook_foldable("plot")
+)
+```
+# Statistical Model
+
+```{r,include=FALSE}
+knitr::read_chunk('glm_model/Final_analysis.R')
+```
+
+```{r,Read Data,include=FALSE}
+
+```
+
+```{r, Preprocess,include=FALSE}
+
+```
+
+```{r,Count bar plot,fold.plot=FALSE}
+
+
+```
+
+從上圖可以看出反應變數中有特別多的0，如果配飾一般的count model，會遇到無法擬合的問題，因此在接下來建模的過程中，我會針對count response配適hurdle model[@feng2021comparison]。
+
+Hurdle model是一個可以處理資料中反應變數為count且有零膨脹問題的模型，因此針對我們的count response會配適這樣的模型，Hurdle model中有兩個重要的假設：
+
+- 假設0來自一個系統性地來源
+- 非零的觀測值來自不同的分配
+
+因此我們需要有一部分的變數來預測是否為0，而另一部分的變數處理轉移到幾個部位。
+
+接下來的部分會分成四個部分，
+
+- Hurdle Model(Lasso)
+- Logistic(Lasso)
+- Hurdle Model(p-value)
+- Logistic(p-value)
+
+前兩部分是在使用lasso所挑選的變數放在hurdle model中和logistic regression中分析。後兩部分是使用p-value所篩選出來的變數，並放在同樣的兩個模型中分析。
+
+hurdle model中，反應變數放的是每個cell line轉移到幾個部位。而logistic regression中放的是每個cell line針對各個部位是否有轉移，因此會比較五個部位的結果。
+
+```{r,create Interaction,include=FALSE}
+```
+
+## Hurdle Model(Lasso)
+
+```{r,Create Interaction DataFrame(lassohurdle),include=FALSE}
+
+```
+
+
+```{r,Zero Inflated(lasso),include=TRUE}
+
+```
+
+報表的上半部分為針對count類型的變數所配適模型的結果，下半部分為針對是否為0所配適模型的結果。
+可以看到，僅有`CAPN5..726. _ TFAP2A..7020.`、`CAPN5..726. _ TFAP2A..7020.`、`MAGEA2..4101. _ P2RX5..5026.`、`C34.4.PC _ adipate`是顯著的。
+
+我們進一步檢查MSE來看看模型配適的好壞與否。
+
+### 分析結果
+
+```{r,Zero Inflated(lasso) consequence,include=TRUE}
+
+```
+
+從MSE來看，這個模型配適的並不差。
+
+## Logistic(Lasso)
+
+```{r,Create Interaction DataFrame(lassologit),include=FALSE}
+
+```
+
+```{r,Logistic(lasso),message=FALSE,warning=FALSE}
+
+```
+
+以下報表整理了五個器官針對各個變數的係數，()內的數字是standard error，*號代表此變數p-value<0.05，若某變數針對某部位是空格，代表在篩選變數階段，此變數就已經被篩選掉了。
+
+我們可以從表格中看到，在篩選變數階段，五個部位篩選出來的變數就有明顯的不同，最多只有兩兩重複的變數，在進一步看顯著性，可以看出，沒有任何一個變數對於五個部位的轉移是有重複的，因此可以看出五個部位的轉移與否並沒有共用的變因。
+```{r,overall summary(logit.lasso)}
+#| output: asis
+```
+
+### AUC
+```{r,auc(logit.lasso)}
+```
+在liver和lung的auc上，都為1，因為運算問題，在使用glm模型時，程式會回傳"waring:fitted probabilities numerically 0 or 1 occurred"[@glmfit]，這個問題需要我們重新挑選變數才能解決，但是在這邊，我們進一步的切割train-test來看看模型是否有效。
+
+### Accuracy
+在這裏，我們按照反應變數的比例把train:test切割成8:2，來檢驗我們模型的accuracy。
+
+```{r,Train Test,warning=FALSE,message=FALSE}
+
+```
+
+接下來的兩個小節為使用p-value所挑出的變數以及其分析結果。呈現方式和上述使用lasso所挑出的變數所呈現的方一致。
+
+## Hurdle(p-value)
+
+
+```{r,Zero Inflated(pvalue),include=TRUE}
+
+```
+
+### 分析結果
+```{r,Zero Inflated(pvalue) consequence,include=TRUE}
+
+```
+
+從結果可以看出使用p-value挑出的變數並沒有lasso來得好。lasso所挑出的變數MSE僅有0.763，但p-value所挑出的變數MSE來到了將近3左右。
+
+## Logistic(p-value)
+```{r,Logistic(pvalue),include=TRUE,message=FALSE,warning=FALSE}
+
+```
+
+```{r,overall summary(logit.pv)}
+#| output: asis
+```
+
+從以上整理的報表可以看到，使用p-value所挑出的變數中，針對各個部位所挑出的變數有更多重複的變數，例如AREG..374.在bone, brain和kideny中均有使用到這個變數，但是建立出來的模型但是對於三個部位，此變數皆不顯著。
+
+從變數顯著與否的角度來看，五個器官皆沒共通顯著的基因或是代謝體抑或是交互作用。
+
+### AUC
+```{r,auc(logit.pv)}
+
+```
+
+### Accuracy
+```{r,Train Test(p-value),warning=FALSE,message=FALSE}
+
+```
+
+從Accuracy也可以看出，以p-value所挑出的變數也皆劣於lasso所挑出的變數。
+
+## 結論
+
+從以上結果可以的得之，lasso在這樣類型的資料中，其挑選的變數是優於使用p-value的方式所挑選出來的變數。

@@ -1,0 +1,172 @@
+
+# Introduction
+
+本次報告使用的資料來自於 DepMap Portal，其屬於 DepMap Consortium (DMC)，此機構致力於加速癌症精準醫療的發展，建構了具系統性的資料集，並提供多種工具可進一步分析與視覺化。
+
+![Figure 1. DepMap Portal](Descriptive Statistics/depmap.png)
+
+本次報告使用的資料可分為基因表達量、代謝體濃度、癌細胞轉移方向，分別有1406、264、264筆 (cell lines) 資料。資料是基於以下實驗流程取得[@Depmap]:
+
+![Figure 2. Metastasis Map of Human Cancer Cell Lines](Descriptive Statistics/experiment.png)
+
+在基因表達量此資料中，包含1406筆cell lines、19221個基因表達量 (經正規化後的RNA-seq資料)，資料整理如下:
+
+![Figure 3. Overview of Genes Dataset](Descriptive Statistics/genes.png)
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+library(ztable)
+cgroup = c("Genes", "Cell Lines")
+n.cgroup = c(3, 3)
+data_z <- data.frame(Complete = c(0, 7959), Contains.0 = c(1406, 11262), Total = c(1406, 19221))
+data_z <- cbind(data_z[1, ], data_z[2, ])
+rownames(data_z) <- "Number"
+z <- ztable(data_z, caption = "Table 1. Overview of Genes Dataset", caption.placement = "bottom", digits = 0, align = "ccccccc")
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+由表1可看出此資料有很多0，且所有基因都有些許樣本是測不到的，而這些測不到的基因(表達量為0)的可能原因有很多，包含此基因本身就不容易被測序到，也因此此基因本來就不容易做後續分析，因而可以將其移除；又或者是測序過程導致的，則可針對其原因作數值調整；也或者是在這組樣本上表達量本來就是0，所以無需作任何調整。基於以上可能原因，在無法確認為何種原因的情況下，先將資料保留，待後續Quality Control階段一併處理。
+
+在代謝體濃度此資料中，包含265筆cell lines、225個代謝體濃度 (經log轉換後) ，其中有41筆重複的
+cell lines，資料整理如下:
+
+![Figure 4. Overview of Metabolites Dataset](Descriptive Statistics/metabolites.png)
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+library(ztable)
+cgroup = c("Metabolites", "Cell Lines")
+n.cgroup = c(3, 3)
+data_z <- data.frame(Complete = c(224, 225), Contains.0 = c(0, 0), Total = c(224, 225))
+data_z <- cbind(data_z[1, ], data_z[2, ])
+rownames(data_z) <- "Number"
+z <- ztable(data_z, caption = "Table 2. Overview of Metabolites Dataset", caption.placement = "bottom", digits = 0, align = "ccccccc")
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+由表2可看出此資料所有數值皆不為0。
+
+在癌細胞轉移方向此資料中，包含265筆cell lines、5種器官(癌細胞是否轉移)以及癌細胞所屬主要癌症
+，其中有41筆重複的cell lines，且皆無遺失值。
+
+![Figure 5. Overview of Metastasis Dataset](Descriptive Statistics/response.png)
+
+以DepMap ID將三種資料中共有的cell lines進行整合，整合的資料共224筆(cell lines)，包含19221個基因(表達量)、225個代謝體(濃度)、5種器官(癌細胞是否轉移)以及癌細胞所屬主要癌症症，且皆無遺失值。
+
+# Quality Control
+在基因表達量此資料中，移除1526個低表達量的基因($>0.5$的個數至少有2個)，接著移除13268個有極值表現量的基因($>3$倍標準差)，移除後的資料包含224筆cell lines、4427個基因表達量[@QC]。
+
+以圖6為例，$TNMD(64102)$此基因表達量大於$0.5$個數僅有一個(其值為$0.584962501$)，因此移除$TNMD(64102)$此基因。
+
+![Figure 6. Demonstration of Low Expression Gene](Descriptive Statistics/genes low expression.png)
+
+```{r, echo = FALSE, results = 'hide', cache = TRUE}
+genes <- read.csv("Data/genes.csv")
+metabolites <- read.csv("Data/metabolites.csv")
+response <- read.csv("Data/response.csv")
+
+# remove duplicated samples
+metabolites <- metabolites[-which(duplicated(metabolites)), ]
+response <- response[-which(duplicated(response)), ]
+genes <- genes[genes$X %in% metabolites$ID,]
+rownames(genes) <- genes[,1]
+rownames(metabolites) <- metabolites[,1]
+genes <- genes[,-1]
+metabolites <- metabolites[,-1]
+genes <- as.data.frame(t(genes))
+metabolites <- as.data.frame(t(metabolites))
+
+# remove low expression gene
+thresh <- rowSums(genes > 0.5) >= 2
+genes_cut <- genes[thresh,]
+
+# remove extreme-value gene
+gene_sd <- apply(genes_cut, 1, sd)
+extreme_thresh <- abs(genes_cut - rowMeans(genes_cut)) > (3 * gene_sd)
+extreme_thresh <- rowSums(extreme_thresh) > 0
+genes_cut <- genes_cut[!extreme_thresh,]
+rm(thresh)
+rm(extreme_thresh)
+rm(gene_sd)
+```
+
+# Summary Statistics & Data Visualization
+## Plots of Statistics
+### Bar Chart of Metastasis on 5 Organs
+
+```{r, warning = FALSE, echo = FALSE, results = "hide", include = FALSE, cache = TRUE}
+library(ggplot2)
+library(plyr)
+par(mfrow = c(1,1))
+metastasis <- NULL
+for (i in colnames(response)[-c(3,7)]){
+  freq <- count(response, i)
+  freq["Organ"] <- rep(colnames(freq)[1], 2)
+  colnames(freq)[1] <- "Status"
+  colnames(freq)[2] <- "Proportion"
+  if (length(metastasis) == 0){
+    metastasis <- freq
+  }else{
+    metastasis <- rbind(metastasis, freq)
+  }
+}
+ggplot(metastasis, aes(fill = Status, y = Proportion, x = Organ)) + 
+  scale_fill_brewer(palette = "Set1") +
+  geom_bar(position = "fill", stat = "identity", width = 0.5) +
+  geom_text(aes(y = Proportion, label = Proportion), colour = "white", position = position_fill(vjust = 0.5))
+ggsave("Descriptive Statistics/metastasis.png")
+```
+
+![Figure 7. Stacked Bar Chart of Metastasis on 5 Organs](Descriptive Statistics/metastasis.png)
+
+由圖7可看出癌細胞是否轉移在Brain上的資料是明顯不平衡的，在其他器官上的資料則相對平衡，這在後續模型切割訓練集與測試集的時候須納入考量，依比例切割。
+
+### Bar Chart of Statistics about Gene Expression
+
+```{r, warning = FALSE, echo = FALSE, results = "hide", include = FALSE, cache = TRUE}
+library(e1071)
+library(ggpubr)
+library(gridExtra)
+figure <- list()
+binwidth <- c(1, 1, 0.4, 0.3)
+gene_statistic <- data.frame(Mean = apply(genes_cut, 1, mean),
+                             Variance = apply(genes_cut, 1, var),
+                             Kurtosis = apply(genes_cut, 1, kurtosis),
+                             Skewness = apply(genes_cut, 1, skewness))
+for (i in seq(4)) {
+  figure[[i]] <- ggplot(gene_statistic) + aes_string(colnames(gene_statistic)[i]) + 
+    geom_histogram(aes(y = ..density..), color = "darkblue", fill = "lightblue", 
+                   binwidth = binwidth[i]) + geom_density(col = 2) + 
+    ylab("Density")}
+gene_statistic <- arrangeGrob(grobs = figure, ncol = 2, nrow = 2)
+ggsave("Descriptive Statistics/gene statistic.png", gene_statistic)
+```
+
+![Figure 8. Bar Chart of Statistics about Gene Expression](Descriptive Statistics/gene statistic.png)
+
+由圖8的基因表達量Mean分布圖可看出基因表達量大多集中在0到8之間，但也有些許基因有較高的表達量($>15$)，代表大部分基因之間表達量彼此差異小，小部分基因與其他基因有較大的表達量差異。Variance分布圖則可看出大部分基因表達量Variance都超過1，甚至有小部分基因表達量Variance接近15，代表大部分基因表達量差異大，這也可以從Kurtosis分布圖上佐證，大部分基因表達量Kurtosis小於0，代表大部分基因表達量較分散。Skewness分布圖則看出有小部分基因表達量有些微左偏和右偏的情況。
+
+### Bar Chart of Statistics about Metabolites
+
+```{r, warning = FALSE, echo = FALSE, results = "hide", include = FALSE, cache = TRUE}
+library(e1071)
+library(ggpubr)
+library(gridExtra)
+figure <- list()
+binwidth <- c(0.03, 0.15, 0.9, 0.4)
+meta_statistic <- data.frame(Mean = apply(metabolites, 1, mean),
+                             Variance = apply(metabolites, 1, var),
+                             Kurtosis = apply(metabolites, 1, kurtosis),
+                             Skewness = apply(metabolites, 1, skewness))
+for (i in seq(4)) {
+  figure[[i]] <- ggplot(meta_statistic) + aes_string(colnames(meta_statistic)[i]) + 
+    geom_histogram(aes(y = ..density..), color = "darkblue", fill = "lightblue", 
+                   binwidth = binwidth[i]) + geom_density(col = 2) + 
+    ylab("Density")}
+meta_statistic <- arrangeGrob(grobs = figure, ncol = 2, nrow = 2)
+ggsave("Descriptive Statistics/meta statistic.png", meta_statistic)
+```
+
+![Figure 9. Bar Chart of Statistics about Metabolites ](Descriptive Statistics/meta statistic.png)
+
+由圖9的代謝體濃度Mean分布圖可看出基因表達量大多集中在5.8到6之間，但也有些許基因有較低的表達量($<5.7$)，但整體而言基因之間表達量彼此差異小。Variance分布圖則可看出大部分基因表達量Variance都小於0.5，只有小部分基因表達量Variance大於1.5，代表大部分基因表達量差異小，這也可以從Kurtosis分布圖上佐證，大部分基因表達量Kurtosis大於0，代表大部分基因表達量較集中。Skewness分布圖則看出有大部分基因表達量有些微左偏和右偏的情況。

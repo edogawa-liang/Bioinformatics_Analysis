@@ -1,0 +1,12 @@
+project: 
+  title: "Proposal"
+author: "Group3"  
+format:
+  pdf:
+    CJKmainfont: "BiauKai"
+    number-sections: true
+    number-depth: 3
+    include-in-header:
+      - text: |
+         \usepackage{setspace,relsize}
+mainfont: "BiauKai"

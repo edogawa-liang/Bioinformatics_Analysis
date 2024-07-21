@@ -1,0 +1,17 @@
+# Exclude specific cache directories
+/descriptive_cache/
+/descriptive_files/
+/.quarto/
+/Final-Report_cache/
+/Final-Report_files/
+/lasso/_lasso_files/
+/_statmodels_cache/
+/_statmodels_files/
+/Data/
+# *.html
+*.Rdata
+*.pickle
+*.pkl
+*.png
+*.csv
+*.RData

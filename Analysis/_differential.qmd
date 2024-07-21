@@ -1,0 +1,553 @@
+## Differential Analysis
+以Primary Disease的Lung Cancer作為切割點，將資料區分成Lung Cancer與Non-Lung Cancer，再比對基因表達量和代謝體濃度在各器官癌細胞是否轉移上是否有顯著不同，而以Lung Cancer做為切割點的原因是有二個，首先已知Lung為預測各器官癌細胞是否轉移的其中之一的器官，直觀上認為考慮到Lung Cancer 對Lung癌細胞是否轉移後續分析上會有較好的表現，其次是以Lung Cancer作為切割點對於後續統計檢定所需的樣本數是足夠的($>30$)。以圖1為例，此圖為基因表達量在Bone上癌細胞是否轉移差異分析流程圖，將基因表達量區分成Lung Cancer與Non-Lung Cancer的資料，再分別對Lung Cancer與Non-Lung Cancer的資料計算在Bone上癌細胞是否轉移的基因表達量Mean相除，取對數後便可得一t檢定量。以下數學式為例，此式為基因Gene1的Lung Cancer的表達量資料t檢定計算式，
+$$T=log(\frac{Mean(Metastasis|Lung,Gene1)}{Mean(NonMetastasis|Lung,Gene1)})$$。以t檢定統計量計算出各基因和各代謝體的$p-value$後，再輔以$fold change$作為篩選變數標準，採滾動式調整，最終挑選出50個基因與代謝體作為後續交互作用項產生所使用的變數，並保留前20個顯著的基因與代謝體(以$p-value$作排序)在最終挑選的變數。由此50個基因與代謝體所產生的交互作用項變數透過前述流程可得出約30個顯著的交互作用項變數，再加上先前所保留20個基因與代謝體變數，最終可得出約50個變數供後續模型使用。
+
+若針對預測至少1種器官發生癌細胞轉移，則將5種器官癌細胞是否轉移整合成至少1種器官癌細胞是否轉移，並依上述流程可得出約50個變數供後續模型使用。
+
+```{mermaid}
+flowchart TD
+  A[Gene Dataset] --> B[Lung Cancer]
+  A --> C[Non-Lung Cancer]
+  B --> D[Bone Metastasis]
+  B --> E[Bone Non-Metastasis]
+  C --> F[Bone Metastasis]
+  C --> G[Bone Non-Metastasis]
+```
+
+Figure 1. Flow Chart of Gene Differential Analysis on Bone Metastasis given Lung Cancer
+
+### Volcano Plot (Bone)
+
+```{r, echo = FALSE, results = "hide", warning = FALSE, include = FALSE, cache = TRUE}
+library(limma)
+library(hash)
+response$lung_cancer <- response$primary_disease
+response$lung_cancer <- sapply(response$lung_cancer, function(x) gsub(" Cancer", "",  x))
+response$lung_cancer[response$lung_cancer != "Lung"] <- "NonLung"
+organ <- c("bone", "brain", "kidney", "liver", "lung")
+all_candidate <- hash()
+final_candidate <- hash()
+for (i in organ){
+  group <- factor(paste(response$lung_cancer, response[[i]], sep = "."))
+  design <- model.matrix(~ 0 + group)
+  colnames(design) <- levels(group)
+  candidate <- c()
+  for (type in c("gene", "meta")){
+    for (lung in c("Lung", "NonLung")){
+      if (lung == "Lung"){
+        cont.matrix <- makeContrasts(Lung.MetastasisVsNonMetastasis = Lung.Metastasis - Lung.NonMetastasis,levels = design)
+      }else{
+        cont.matrix <- makeContrasts(NonLung.MetastasisVsNonMetastasis = NonLung.Metastasis - NonLung.NonMetastasis,levels = design)
+      }
+      if (type == "gene"){
+        fit <- lmFit(genes_cut, design = design)
+      }else{
+        fit <- lmFit(metabolites, design = design)
+      }
+      fit.cont <- contrasts.fit(fit, cont.matrix)
+      fit.cont <- eBayes(fit.cont)
+      #png(paste0("Descriptive Statistics/Volcano_", i, "_", lung, "_", type, ".png"), width = 800, height = 800)
+      if (type == "gene"){
+        gene_name <- gsub("\\..*", "", rownames(fit.cont$p.value))
+        if (i == "kidney"){
+          p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.005]
+          f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.5]
+        }else if (i == "bone"){
+          p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.015]
+          f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.5]
+        }else if (i == "brain"){
+          p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.005]
+          f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.25]
+        }else if (i == "lung"){
+          p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.015]
+          f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.5]
+        }else{
+          p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.015]
+          f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.6]
+        }
+        volcanoplot(fit.cont, coef = 1, highlight = length(p),
+                    names = gene_name,
+                    main = paste0(i, " Metastasis of ", lung, " Cancer (", type, ")"))
+      }else{
+        if (i == "kidney"){
+          p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.005]
+          f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.15]
+        }else if (i == "bone"){
+          p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.025]
+          f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.1]
+        }else if (i == "brain"){
+          p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.025]
+          f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.15]
+        }else{
+          p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.075]
+          f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.15]
+        }
+        volcanoplot(fit.cont, coef = 1, highlight = length(p),
+                    names = rownames(fit.cont$p.value),
+                    main = paste0(i, " Metastasis of ", lung, " Cancer (", type, ")"))
+      }
+      candidate_p <- fit.cont$p.value[intersect(p,f),]
+      if (length(candidate) == 0){
+        candidate_name <- rownames(as.data.frame(candidate_p[order(candidate_p)[1:5]]))
+        candidate <- intersect(p, f)
+      }else{
+        candidate_name <- union(candidate_name, rownames(as.data.frame(candidate_p[order(candidate_p)[1:5]])))
+        candidate <- union(candidate, intersect(p, f))
+      }
+      #dev.off()
+    }
+  }
+  candidate_name <- as.character(na.omit(candidate_name))
+  candidate <- as.character(na.omit(candidate))
+  final_candidate[i] <- candidate_name
+  all_candidate[i] <- candidate
+}
+```
+
+```{r, warning = FALSE, echo = FALSE, results = "hide", include = FALSE, cache = TRUE}
+load("Descriptive Statistics/interaction_transfer.RData")
+all <- rbind(genes_cut, metabolites)
+all <- as.data.frame(t(all))
+inter_candidate <- hash() # it contains genes, metabolites, and interactions
+for (i in organ){
+  all_sub <- all[,all_candidate[[i]]]
+  all_sub <- interaction.trasfer.function(all_sub)
+  all_sub <- as.data.frame(t(all_sub))
+  group <- factor(paste(response$lung_cancer, response[[i]], sep = "."))
+  design <- model.matrix(~ 0 + group)
+  colnames(design) <- levels(group)
+  candidate <- c()
+  for (lung in c("Lung", "NonLung")){
+    if (lung == "Lung"){
+      cont.matrix <- makeContrasts(Lung.MetastasisVsNonMetastasis = Lung.Metastasis - Lung.NonMetastasis,levels = design)
+    }else{
+      cont.matrix <- makeContrasts(NonLung.MetastasisVsNonMetastasis = NonLung.Metastasis - NonLung.NonMetastasis,levels = design)
+    }
+    fit <- lmFit(all_sub, design = design)
+    fit.cont <- contrasts.fit(fit, cont.matrix)
+    fit.cont <- eBayes(fit.cont)
+    #png(paste0("Descriptive Statistics/Volcano_", i, "_", lung, "_all", ".png"), width = 800, height = 800)
+    all_name <- rownames(fit.cont$p.value)
+    all_name <- gsub("\\..*", "", rownames(fit.cont$p.value))
+    if (i == "bone"){
+      p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.0007]
+      f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 3]
+    }else if (i == "lung"){
+      p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.0005]
+      f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 5]
+    }else if (i == "brain"){
+      p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.0005]
+      f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 3.25]
+    }else{
+      p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.0002]
+      f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 6]
+    }
+    volcanoplot(fit.cont, coef = 1, highlight = length(p),
+                names = all_name,
+                main = paste0(i, " Metastasis of ", lung, " Cancer (All)"))
+    if (length(candidate) == 0){
+      candidate <- intersect(p, f)
+    }else{
+      candidate <- union(candidate, intersect(p, f))
+    }
+    #dev.off()
+  }
+  candidate <- as.character(na.omit(candidate))
+  inter_candidate[i] <- as.data.frame(t(rbind(all_sub[final_candidate[[i]],], all_sub[candidate,])))
+}
+rm(all_candidate)
+rm(final_candidate)
+```
+
+```{r, warning = FALSE, echo = FALSE, results = "hide", include = FALSE, cache = TRUE}
+response["organ"] <- rowSums(response[organ] == "Metastasis") > 0
+group <- factor(paste(response$lung_cancer, response$organ, sep = "."))
+design <- model.matrix(~ 0 + group)
+colnames(design) <- levels(group)
+candidate <- c()
+for (type in c("gene", "meta")){
+  for (lung in c("Lung", "NonLung")){
+    if (lung == "Lung"){
+      cont.matrix <- makeContrasts(Lung.MetastasisVsNonMetastasis = Lung.TRUE - Lung.FALSE, levels = design)
+    }else{
+      cont.matrix <- makeContrasts(NonLung.MetastasisVsNonMetastasis = NonLung.TRUE - NonLung.FALSE, levels = design)
+    }
+    if (type == "gene"){
+      fit <- lmFit(genes_cut, design = design)
+    }else{
+      fit <- lmFit(metabolites, design = design)
+    }
+    fit.cont <- contrasts.fit(fit, cont.matrix)
+    fit.cont <- eBayes(fit.cont)
+    #png(paste0("Descriptive Statistics/Volcano_Organ_", lung, "_", type, ".png"), width = 800, height = 800)
+    if (type == "gene"){
+      gene_name <- gsub("\\..*", "", rownames(fit.cont$p.value))
+      p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.004]
+      f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.5]
+      volcanoplot(fit.cont, coef = 1, highlight = length(p),
+                  names = gene_name,
+                  main = paste0("Organ Metastasis of ", lung, " Cancer (", type, ")"))
+    }else{
+      p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.05]
+      f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 0.1]
+      volcanoplot(fit.cont, coef = 1, highlight = length(p),
+                  names = rownames(fit.cont$p.value),
+                  main = paste0("Organ Metastasis of ", lung, " Cancer (", type, ")"))
+    }
+    candidate_p <- fit.cont$p.value[intersect(p,f),]
+    if (length(candidate) == 0){
+      candidate_name <- rownames(as.data.frame(candidate_p[order(candidate_p)[1:5]]))
+      candidate <- intersect(p, f)
+    }else{
+      candidate_name <- union(candidate_name, rownames(as.data.frame(candidate_p[order(candidate_p)[1:5]])))
+      candidate <- union(candidate, intersect(p, f))
+    }
+    #dev.off()
+  }
+}
+candidate_name <- as.character(na.omit(candidate_name))
+candidate <- as.character(na.omit(candidate))
+```
+
+```{r, warning = FALSE, echo = FALSE, results = "hide", include = FALSE, cache = TRUE}
+all_sub <- all[,candidate]
+all_sub <- interaction.trasfer.function(all_sub)
+all_sub <- as.data.frame(t(all_sub))
+group <- factor(paste(response$lung_cancer, response$organ, sep = "."))
+design <- model.matrix(~ 0 + group)
+colnames(design) <- levels(group)
+candidate <- c()
+for (lung in c("Lung", "NonLung")){
+  if (lung == "Lung"){
+    cont.matrix <- makeContrasts(Lung.MetastasisVsNonMetastasis = Lung.TRUE - Lung.FALSE,levels = design)
+  }else{
+    cont.matrix <- makeContrasts(NonLung.MetastasisVsNonMetastasis = NonLung.TRUE - NonLung.FALSE,levels = design)
+  }
+  fit <- lmFit(all_sub, design = design)
+  fit.cont <- contrasts.fit(fit, cont.matrix)
+  fit.cont <- eBayes(fit.cont)
+  #png(paste0("Descriptive Statistics/Volcano_Organ_", lung, "_all", ".png"), width = 800, height = 800)
+  all_name <- rownames(fit.cont$p.value)
+  all_name <- gsub("\\..*", "", rownames(fit.cont$p.value))
+  p <- rownames(fit.cont$p.value)[fit.cont$p.value < 0.0001]
+  f <- rownames(fit.cont$coefficients)[abs(fit.cont$coefficients) > 4]
+  volcanoplot(fit.cont, coef = 1, highlight = length(p),
+              names = all_name,
+              main = paste0("Organ Metastasis of ", lung, " Cancer (All)"))
+  if (length(candidate) == 0){
+    candidate <- intersect(p, f)
+  }else{
+    candidate <- union(candidate, intersect(p, f))
+  }
+  #dev.off()
+}
+candidate <- as.character(na.omit(candidate))
+organ_candidate <- as.data.frame(t(all_sub[c(candidate_name, candidate),]))
+response <- response[,-c(7, 8)]
+rm(all)
+rm(all_sub)
+rm(cont.matrix)
+rm(design)
+rm(fit)
+rm(fit.cont)
+```
+
+![Figure 2. Volcano Plot of Bone Metastasis on Gene Expression under Lung Cancer](Descriptive Statistics/Volcano_bone_lung_gene.png)
+
+![Figure 3. Volcano Plot of Bone Metastasis on Gene Expression under Non-Lung Cancer](Descriptive Statistics/Volcano_bone_nonlung_gene.png)
+
+![Figure 4. Volcano Plot of Bone Metastasis on Metabolites under Lung Cancer](Descriptive Statistics/Volcano_bone_lung_meta.png)
+
+![Figure 5. Volcano Plot of Bone Metastasis on Metabolites under Non-Lung Cancer](Descriptive Statistics/Volcano_bone_nonlung_meta.png)
+
+![Figure 6. Volcano Plot of Bone Metastasis on Interaction Effect under Lung Cancer](Descriptive Statistics/Volcano_bone_lung_all.png)
+
+![Figure 7. Volcano Plot of Bone Metastasis on Interaction Effect under Non-Lung Cancer](Descriptive Statistics/Volcano_bone_nonlung_all.png)
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Bone"
+n.cgroup = c(9)
+data_z <- data.frame(P.value = rep(c(0.015, 0.025), 2), Fold.Change = rep(c(0.5, 0.1), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data_z[3, ], data_z[4, ], data.frame(Number = 48))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 1. Criteria of Differential Analysis on Bone Metastasis without Interaction Effect", caption.placement = "bottom", digits = 3)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(4, 4, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c(rep(c("Genes", "Metabolites"), 2), "")
+n.cgroup = c(2, 2, 2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Bone"
+n.cgroup = c(5)
+data_z <- data.frame(P.value = rep(c(0.0007), 2), Fold.Change = rep(c(3), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data.frame(Number = 47))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 2. Criteria of Differential Analysis on Bone Metastasis with Interaction Effect", caption.placement = "bottom", digits = 4)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+### Volcano Plot (Brain)
+
+![Figure 8. Volcano Plot of Brain Metastasis on Gene Expression under Lung Cancer](Descriptive Statistics/Volcano_brain_lung_gene.png)
+
+![Figure 9. Volcano Plot of Brain Metastasis on Gene Expression under Non-Lung Cancer](Descriptive Statistics/Volcano_brain_nonlung_gene.png)
+
+![Figure 10. Volcano Plot of Brain Metastasis on Metabolites under Lung Cancer](Descriptive Statistics/Volcano_brain_lung_meta.png)
+
+![Figure 11. Volcano Plot of Brain Metastasis on Metabolites under Non-Lung Cancer](Descriptive Statistics/Volcano_brain_nonlung_meta.png)
+
+![Figure 12. Volcano Plot of Brain Metastasis on Interaction Effect under Lung Cancer](Descriptive Statistics/Volcano_brain_lung_all.png)
+
+![Figure 13. Volcano Plot of Brain Metastasis on Interaction Effect under Non-Lung Cancer](Descriptive Statistics/Volcano_brain_nonlung_all.png)
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Brain"
+n.cgroup = c(9)
+data_z <- data.frame(P.value = rep(c(0.005, 0.25), 2), Fold.Change = rep(c(0.25, 0.15), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data_z[3, ], data_z[4, ], data.frame(Number = 53))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 3. Criteria of Differential Analysis on Brain Metastasis without Interaction Effect", caption.placement = "bottom", digits = 3)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(4, 4, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c(rep(c("Genes", "Metabolites"), 2), "")
+n.cgroup = c(2, 2, 2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Brain"
+n.cgroup = c(5)
+data_z <- data.frame(P.value = rep(c(0.0005), 2), Fold.Change = rep(c(3.25), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data.frame(Number = 53))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 4. Criteria of Differential Analysis on Brain Metastasis with Interaction Effect", caption.placement = "bottom", digits = 4)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+### Volcano Plot (Kidney)
+
+![Figure 14. Volcano Plot of Kidney Metastasis on Gene Expression under Lung Cancer](Descriptive Statistics/Volcano_kidney_lung_gene.png)
+
+![Figure 15. Volcano Plot of Kidney Metastasis on Gene Expression under Non-Lung Cancer](Descriptive Statistics/Volcano_kidney_nonlung_gene.png)
+
+![Figure 16. Volcano Plot of Kidney Metastasis on Metabolites under Lung Cancer](Descriptive Statistics/Volcano_kidney_lung_meta.png)
+
+![Figure 17. Volcano Plot of Kidney Metastasis on Metabolites under Non-Lung Cancer](Descriptive Statistics/Volcano_kidney_nonlung_meta.png)
+
+![Figure 18. Volcano Plot of Kidney Metastasis on Interaction Effect under Lung Cancer](Descriptive Statistics/Volcano_kidney_lung_all.png)
+
+![Figure 19. Volcano Plot of Kidney Metastasis on Interaction Effect under Non-Lung Cancer](Descriptive Statistics/Volcano_kidney_nonlung_all.png)
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Kidney"
+n.cgroup = c(9)
+data_z <- data.frame(P.value = rep(c(0.005, 0.005), 2), Fold.Change = rep(c(0.5, 0.15), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data_z[3, ], data_z[4, ], data.frame(Number = 48))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 5. Criteria of Differential Analysis on Kidney Metastasis without Interaction Effect", caption.placement = "bottom", digits = 3)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(4, 4, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c(rep(c("Genes", "Metabolites"), 2), "")
+n.cgroup = c(2, 2, 2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Kidney"
+n.cgroup = c(5)
+data_z <- data.frame(P.value = rep(c(0.0002), 2), Fold.Change = rep(c(6), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data.frame(Number = 48))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 6. Criteria of Differential Analysis on Kidney Metastasis with Interaction Effect", caption.placement = "bottom", digits = 4)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+### Volcano Plot (Liver)
+
+![Figure 20. Volcano Plot of Liver Metastasis on Gene Expression under Lung Cancer](Descriptive Statistics/Volcano_liver_lung_gene.png)
+
+![Figure 21. Volcano Plot of Liver Metastasis on Gene Expression under Non-Lung Cancer](Descriptive Statistics/Volcano_liver_nonlung_gene.png)
+
+![Figure 22. Volcano Plot of Liver Metastasis on Metabolites under Lung Cancer](Descriptive Statistics/Volcano_liver_lung_meta.png)
+
+![Figure 23. Volcano Plot of Liver Metastasis on Metabolites under Non-Lung Cancer](Descriptive Statistics/Volcano_liver_nonlung_meta.png)
+
+![Figure 24. Volcano Plot of Liver Metastasis on Interaction Effect under Lung Cancer](Descriptive Statistics/Volcano_liver_lung_all.png)
+
+![Figure 25. Volcano Plot of Liver Metastasis on Interaction Effect under Non-Lung Cancer](Descriptive Statistics/Volcano_liver_nonlung_all.png)
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Liver"
+n.cgroup = c(9)
+data_z <- data.frame(P.value = rep(c(0.015, 0.075), 2), Fold.Change = rep(c(0.6, 0.15), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data_z[3, ], data_z[4, ], data.frame(Number = 53))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 7. Criteria of Differential Analysis on Liver Metastasis without Interaction Effect", caption.placement = "bottom", digits = 3)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(4, 4, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c(rep(c("Genes", "Metabolites"), 2), "")
+n.cgroup = c(2, 2, 2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Liver"
+n.cgroup = c(5)
+data_z <- data.frame(P.value = rep(c(0.0002), 2), Fold.Change = rep(c(6), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data.frame(Number = 49))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 8. Criteria of Differential Analysis on Liver Metastasis with Interaction Effect", caption.placement = "bottom", digits = 4)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+### Volcano Plot (Lung)
+
+![Figure 26. Volcano Plot of Lung Metastasis on Gene Expression under Lung Cancer](Descriptive Statistics/Volcano_lung_lung_gene.png)
+
+![Figure 27. Volcano Plot of Lung Metastasis on Gene Expression under Non-Lung Cancer](Descriptive Statistics/Volcano_lung_nonlung_gene.png)
+
+![Figure 28. Volcano Plot of Lung Metastasis on Metabolites under Lung Cancer](Descriptive Statistics/Volcano_lung_lung_meta.png)
+
+![Figure 29. Volcano Plot of Lung Metastasis on Metabolites under Non-Lung Cancer](Descriptive Statistics/Volcano_lung_nonlung_meta.png)
+
+![Figure 30. Volcano Plot of Lung Metastasis on Interaction Effect under Lung Cancer](Descriptive Statistics/Volcano_lung_lung_all.png)
+
+![Figure 31. Volcano Plot of Lung Metastasis on Interaction Effect under Non-Lung Cancer](Descriptive Statistics/Volcano_lung_nonlung_all.png)
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Lung"
+n.cgroup = c(9)
+data_z <- data.frame(P.value = rep(c(0.015, 0.075), 2), Fold.Change = rep(c(0.5, 0.15), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data_z[3, ], data_z[4, ], data.frame(Number = 51))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 9. Criteria of Differential Analysis on Lung Metastasis without Interaction Effect", caption.placement = "bottom", digits = 3)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(4, 4, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c(rep(c("Genes", "Metabolites"), 2), "")
+n.cgroup = c(2, 2, 2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Lung"
+n.cgroup = c(5)
+data_z <- data.frame(P.value = rep(c(0.0005), 2), Fold.Change = rep(c(5), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data.frame(Number = 52))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 10. Criteria of Differential Analysis on Lung Metastasis with Interaction Effect", caption.placement = "bottom", digits = 4)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+### Volcano Plot (Organ)
+
+![Figure 32. Volcano Plot of Organ Metastasis on Gene Expression under Lung Cancer](Descriptive Statistics/Volcano_organ_lung_gene.png)
+
+![Figure 33. Volcano Plot of Organ Metastasis on Gene Expression under Non-Lung Cancer](Descriptive Statistics/Volcano_organ_nonlung_gene.png)
+
+![Figure 34. Volcano Plot of Organ Metastasis on Metabolites under Lung Cancer](Descriptive Statistics/Volcano_organ_lung_meta.png)
+
+![Figure 35. Volcano Plot of Organ Metastasis on Metabolites under Non-Lung Cancer](Descriptive Statistics/Volcano_organ_nonlung_meta.png)
+
+![Figure 36. Volcano Plot of Organ Metastasis on Interaction Effect under Lung Cancer](Descriptive Statistics/Volcano_organ_lung_all.png)
+
+![Figure 37. Volcano Plot of Organ Metastasis on Interaction Effect under Non-Lung Cancer](Descriptive Statistics/Volcano_organ_nonlung_all.png)
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Organ"
+n.cgroup = c(9)
+data_z <- data.frame(P.value = rep(c(0.004, 0.05), 2), Fold.Change = rep(c(0.5, 0.1), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data_z[3, ], data_z[4, ], data.frame(Number = 52))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 11. Criteria of Differential Analysis on Organ Metastasis without Interaction Effect", caption.placement = "bottom", digits = 3)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(4, 4, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c(rep(c("Genes", "Metabolites"), 2), "")
+n.cgroup = c(2, 2, 2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+```{r, echo = FALSE, warning = FALSE, results = 'asis', cache = TRUE}
+cgroup = "Organ"
+n.cgroup = c(5)
+data_z <- data.frame(P.value = rep(c(0.0001), 2), Fold.Change = rep(c(4), 2))
+data_z <- cbind(data_z[1, ], data_z[2, ], data.frame(Number = 50))
+rownames(data_z) <- "Criteria"
+z <- ztable(data_z, caption = "Table 12. Criteria of Differential Analysis on Organ Metastasis with Interaction Effect", caption.placement = "bottom", digits = 4)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+cgroup = c("Lung Cancer", "Non-Lung Cancer", "Total")
+n.cgroup = c(2, 2, 1)
+z <- addcgroup(z, cgroup = cgroup, n.cgroup = n.cgroup)
+z
+```
+
+最終挑選出的變數整理如下:
+
+```{r, echo = FALSE, warning = FALSE, cache = TRUE}
+var_len <- 0
+for (i in organ){
+  var_len <- max(var_len, dim(inter_candidate[[i]])[2])
+}
+var_len <- max(var_len, dim(organ_candidate)[2])
+
+bone.df <- data.frame(variables_bone = colnames(inter_candidate$bone))
+bone.df <- rbind(bone.df, data.frame(variables_bone = rep(c(NA), var_len - length(bone.df$variables_bone))))
+
+brain.df <- data.frame(variables_brain = colnames(inter_candidate$brain))
+brain.df <- rbind(brain.df, data.frame(variables_brain = rep(c(NA), var_len - length(brain.df$variables_brain))))
+
+kidney.df <- data.frame(variables_kidney = colnames(inter_candidate$kidney))
+kidney.df <- rbind(kidney.df, data.frame(variables_kidney = rep(c(NA), var_len - length(kidney.df$variables_kidney))))
+
+liver.df <- data.frame(variables_liver = colnames(inter_candidate$liver))
+liver.df <- rbind(liver.df, data.frame(variables_liver = rep(c(NA), var_len - length(liver.df$variables_liver))))
+
+lung.df <- data.frame(variables_lung = colnames(inter_candidate$lung))
+lung.df <- rbind(lung.df, data.frame(variables_lung = rep(c(NA), var_len - length(lung.df$variables_lung))))
+
+binary.df <- data.frame(variables_binary = colnames(organ_candidate))
+binary.df <- rbind(binary.df, data.frame(variables_binary = rep(c(NA), var_len - length(binary.df$variables_binary))))
+
+variable.df <- data.frame(bone.df, brain.df, kidney.df, liver.df, lung.df, binary.df)
+
+knitr::kable(variable.df)
+```

@@ -1,0 +1,24 @@
+---
+title: "Final Report"
+---
+
+```{r}
+library(reticulate)
+use_virtualenv("~/.virtualenvs/r-reticulate")
+```
+{{< include _descriptive.qmd >}}
+
+# 機器學習分析
+{{< include group3_MLDL.qmd >}}
+
+{{< include _analysisflow.qmd >}}
+
+# 篩選變數
+{{< include _differential.qmd >}}
+
+## Lasso
+
+{{< include lasso/_lasso.qmd >}}
+
+{{< include _statmodels.qmd >}}
+

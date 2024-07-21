@@ -1,0 +1,21 @@
+project: 
+  title: "Final Report"
+subtitle: "Group 3"
+date: today
+author: 尹子維、李承祐、黃亮臻、張立勳
+execute:
+  echo: false
+  cache: false 
+format:
+  html:
+   embed-resources: true
+  # pdf:
+  #   CJKmainfont: "BiauKai"
+  #   number-sections: true
+  #   number-depth: 3
+  #   include-in-header:
+  #     - text: |
+  #        \usepackage{setspace,relsize}
+mainfont: "BiauKai"
+toc: true
+bibliography: references.bib

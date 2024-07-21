@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.4.550">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>lasso</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="_lasso_files/libs/clipboard/clipboard.min.js"></script>
+<script src="_lasso_files/libs/quarto-html/quarto.js"></script>
+<script src="_lasso_files/libs/quarto-html/popper.min.js"></script>
+<script src="_lasso_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="_lasso_files/libs/quarto-html/anchor.min.js"></script>
+<link href="_lasso_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="_lasso_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="_lasso_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="_lasso_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="_lasso_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+
+
+
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">read_chunk</span>(<span class="st">'lasso.R'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>由於變數過多所以我們對基因資料和代謝體資料做降維，而我們第一個嘗試的降維方法為PCA，我們分別對兩筆資料做PCA，但因為兩筆資料的樣本數都遠少於變數個數，前幾個主成分也不能解釋大部分原始資料的變異，從特徵值來看也沒有一個有大於1。所以我們認為做PCA的效益不大，後續再使用別種方法進行降維。</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="st">"Datas.RData"</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>pca_g <span class="ot">&lt;-</span> <span class="fu">prcomp</span>(genes_filter, <span class="at">center =</span> <span class="cn">TRUE</span>, <span class="at">scale=</span><span class="cn">TRUE</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>pve_g <span class="ot">=</span> (pca_g<span class="sc">$</span>sdev<span class="sc">^</span><span class="dv">2</span>)<span class="sc">/</span><span class="fu">sum</span>(pca_g<span class="sc">$</span>sdev<span class="sc">^</span><span class="dv">2</span>) <span class="co">#* 100</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(pve_g, <span class="at">type=</span><span class="st">"o"</span>, <span class="at">ylab=</span><span class="st">"Eigenvalue"</span>, <span class="at">xlab =</span> <span class="st">"Principal Component"</span>, <span class="at">main=</span><span class="st">'genes'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_lasso_files/figure-html/pca-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">cumsum</span>(pve_g), <span class="at">type=</span><span class="st">"o"</span>, <span class="at">ylab=</span><span class="st">"Explained Variance "</span>, <span class="at">xlab =</span> <span class="st">"Principal Component"</span>, <span class="at">main=</span><span class="st">'genes'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_lasso_files/figure-html/pca-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>pca_m <span class="ot">&lt;-</span> <span class="fu">prcomp</span>(metabolites_filter, <span class="at">center =</span> <span class="cn">TRUE</span>, <span class="at">scale=</span><span class="cn">TRUE</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>pve_m <span class="ot">=</span> (pca_m<span class="sc">$</span>sdev<span class="sc">^</span><span class="dv">2</span>)<span class="sc">/</span><span class="fu">sum</span>(pca_m<span class="sc">$</span>sdev<span class="sc">^</span><span class="dv">2</span>) <span class="co">#* 100</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(pve_m, <span class="at">type=</span><span class="st">"o"</span>, <span class="at">ylab=</span><span class="st">"Eigenvalue"</span>, <span class="at">xlab =</span> <span class="st">"Principal Component"</span>, <span class="at">main=</span><span class="st">'metabolites'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_lasso_files/figure-html/pca-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">cumsum</span>(pve_m), <span class="at">type=</span><span class="st">"o"</span>, <span class="at">ylab=</span><span class="st">"Explained Variance "</span>, <span class="at">xlab =</span> <span class="st">"Principal Component"</span>, <span class="at">main=</span><span class="st">'metabolites'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="_lasso_files/figure-html/pca-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>這些是由基因和代謝體各用lasso挑出25個變數，再由50個變數加上所有二階交互作用中用lasso挑出其中50個變數。其中bone/brain/kidney/liver/lung是分別對五種疾病各建一個羅吉斯迴歸模型。binary是只要其中一種疾病有轉移，就coding 成1的羅吉斯迴歸模型。而count為轉移到幾個地方的Poisson 迴歸模型。可以注意到的是不管是哪個模型，我們用lasso挑出來的變數都是二階交互作用項，且每個模型中都有基因對基因和基因對代謝體還有代謝體對代謝體的交互作用。</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(variable.df)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 22%">
+<col style="width: 9%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 11%">
+<col style="width: 11%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">variables_bone</th>
+<th style="text-align: left;">variables_brain</th>
+<th style="text-align: left;">variables_kidney</th>
+<th style="text-align: left;">variables_liver</th>
+<th style="text-align: left;">variables_lung</th>
+<th style="text-align: left;">variables_binary</th>
+<th style="text-align: left;">variables_count</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: left;">(Intercept)</td>
+<td style="text-align: left;">(Intercept)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">EHHADH..1962. _ LAMA4..3910.</td>
+<td style="text-align: left;">TAPBPL..55080. _ ZCWPW1..55063.</td>
+<td style="text-align: left;">CD44..960. _ ZFX..7543.</td>
+<td style="text-align: left;">ELP4..26610. _ P2RX5..5026.</td>
+<td style="text-align: left;">SLC1A5..6510. _ ITGAE..3682.</td>
+<td style="text-align: left;">ST6GAL1..6480. _ PTPRU..10076.</td>
+<td style="text-align: left;">ABCA7..10347. _ CD44..960.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">IGFLR1..79713. _ LMCD1..29995.</td>
+<td style="text-align: left;">PSTPIP2..9050. _ TNS4..84951.</td>
+<td style="text-align: left;">LIPE..3991. _ CD44..960.</td>
+<td style="text-align: left;">EXOC2..55770. _ TYRO3..7301.</td>
+<td style="text-align: left;">COL12A1..1303. _ WNT5B..81029.</td>
+<td style="text-align: left;">TFPT..29844. _ SYNE2..23224.</td>
+<td style="text-align: left;">IFT74..80173. _ P2RX5..5026.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">IGFLR1..79713. _ PIGT..51604.</td>
+<td style="text-align: left;">PLCL2..23228. _ TNS4..84951.</td>
+<td style="text-align: left;">P2RX5..5026. _ LIPE..3991.</td>
+<td style="text-align: left;">RTN4IP1..84816. _ TYRO3..7301.</td>
+<td style="text-align: left;">SERP1..27230. _ CDIPT..10423.</td>
+<td style="text-align: left;">ELK3..2004. _ PTPRU..10076.</td>
+<td style="text-align: left;">TFPT..29844. _ IFRD1..3475.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">RAB15..376267. _ PPDPF..79144.</td>
+<td style="text-align: left;">PLCL2..23228. _ GCSH..2653.</td>
+<td style="text-align: left;">ELP4..26610. _ CD44..960.</td>
+<td style="text-align: left;">TEX2..55852. _ EHHADH..1962.</td>
+<td style="text-align: left;">ECHDC2..55268. _ FXYD5..53827.</td>
+<td style="text-align: left;">TBP..6908. _ PDE8A..5151.</td>
+<td style="text-align: left;">ACCS..84680. _ ITGA6..3655.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">RAB15..376267. _ DTNA..1837.</td>
+<td style="text-align: left;">RFT1..91869. _ RPL18..6141.</td>
+<td style="text-align: left;">SLCO1B3..28234. _ P2RX5..5026.</td>
+<td style="text-align: left;">FEM1A..55527. _ SPRY2..10253.</td>
+<td style="text-align: left;">EXOSC9..5393. _ SLC1A5..6510.</td>
+<td style="text-align: left;">NAAA..27163. _ TRIM2..23321.</td>
+<td style="text-align: left;">LYST..1130. _ IFRD1..3475.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">LYST..1130. _ EHHADH..1962.</td>
+<td style="text-align: left;">NNMT..4837. _ CAPN5..726.</td>
+<td style="text-align: left;">TENT5A..55603. _ LIPE..3991.</td>
+<td style="text-align: left;">UCHL1..7345. _ TEX2..55852.</td>
+<td style="text-align: left;">RHOF..54509. _ DHODH..1723.</td>
+<td style="text-align: left;">NAAA..27163. _ LAMA4..3910.</td>
+<td style="text-align: left;">NOTCH1..4851. _ P2RX5..5026.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">CIART..148523. _ LAMA4..3910.</td>
+<td style="text-align: left;">NNMT..4837. _ MAGED4..728239.</td>
+<td style="text-align: left;">ZNF513..130557. _ SLC38A5..92745.</td>
+<td style="text-align: left;">NOS3..4846. _ P2RX5..5026.</td>
+<td style="text-align: left;">RHOF..54509. _ EXOSC9..5393.</td>
+<td style="text-align: left;">PSTPIP2..9050. _ ST6GAL1..6480.</td>
+<td style="text-align: left;">NOTCH1..4851. _ APOC1..341.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">CIART..148523. _ RAB15..376267.</td>
+<td style="text-align: left;">NNMT..4837. _ THAP8..199745.</td>
+<td style="text-align: left;">SCARA3..51435. _ LIPE..3991.</td>
+<td style="text-align: left;">HDX..139324. _ PIK3IP1..113791.</td>
+<td style="text-align: left;">GCSH..2653. _ SLC1A5..6510.</td>
+<td style="text-align: left;">UCHL1..7345. _ LY75..4065.</td>
+<td style="text-align: left;">CAPN5..726. _ TFAP2A..7020.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">THAP8..199745. _ SYNE2..23224.</td>
+<td style="text-align: left;">SAAL1..113174. _ EML2..24139.</td>
+<td style="text-align: left;">LRRC8E..80131. _ ZFX..7543.</td>
+<td style="text-align: left;">TRAPPC1..58485. _ ELP4..26610.</td>
+<td style="text-align: left;">GCSH..2653. _ ARHGEF2..9181.</td>
+<td style="text-align: left;">GPSM1..26086. _ NLRP1..22861.</td>
+<td style="text-align: left;">PSTPIP2..9050. _ P2RX5..5026.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">THAP8..199745. _ CIART..148523.</td>
+<td style="text-align: left;">ZNF608..57507. _ CAPN5..726.</td>
+<td style="text-align: left;">FUT10..84750. _ SCARA3..51435.</td>
+<td style="text-align: left;">TNFRSF10D..8793. _ FEM1A..55527.</td>
+<td style="text-align: left;">LYST..1130. _ FBXL16..146330.</td>
+<td style="text-align: left;">GPX8..493869. _ HFE..3077.</td>
+<td style="text-align: left;">UCHL1..7345. _ LY75..4065.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">SMIM14..201895. _ DTNA..1837.</td>
+<td style="text-align: left;">IRS1..3667. _ ZCWPW1..55063.</td>
+<td style="text-align: left;">ZNF548..147694. _ ZNF513..130557.</td>
+<td style="text-align: left;">PHYHD1..254295. _ FEM1A..55527.</td>
+<td style="text-align: left;">UCHL1..7345. _ TNFRSF1B..7133.</td>
+<td style="text-align: left;">GPX8..493869. _ PTPRU..10076.</td>
+<td style="text-align: left;">UCHL1..7345. _ LAMA4..3910.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SAAL1..113174. _ P2RX5..5026.</td>
+<td style="text-align: left;">IRS1..3667. _ TAPBPL..55080.</td>
+<td style="text-align: left;">ZNF548..147694. _ SCARA3..51435.</td>
+<td style="text-align: left;">TMEM107..84314. _ EXOC2..55770.</td>
+<td style="text-align: left;">UCHL1..7345. _ LYST..1130.</td>
+<td style="text-align: left;">GPX8..493869. _ PHKA1..5255.</td>
+<td style="text-align: left;">UCHL1..7345. _ TFAP2A..7020.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">CCDC106..29903. _ LMCD1..29995.</td>
+<td style="text-align: left;">IRS1..3667. _ ZNF608..57507.</td>
+<td style="text-align: left;">ZNF471..57573. _ TENT5A..55603.</td>
+<td style="text-align: left;">ARPIN..348110. _ FEM1A..55527.</td>
+<td style="text-align: left;">ZSCAN12..9753. _ TNFRSF1B..7133.</td>
+<td style="text-align: left;">GPX8..493869. _ MDFI..4188.</td>
+<td style="text-align: left;">ZSCAN12..9753. _ UCHL1..7345.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SESTD1..91404. _ IGFLR1..79713.</td>
+<td style="text-align: left;">MYEOV..26579. _ SAAL1..113174.</td>
+<td style="text-align: left;">ZNF471..57573. _ SERPINB9..5272.</td>
+<td style="text-align: left;">ARPIN..348110. _ PHYHD1..254295.</td>
+<td style="text-align: left;">ZSCAN12..9753. _ PLCB4..5332.</td>
+<td style="text-align: left;">LRRC8E..80131. _ PDE8A..5151.</td>
+<td style="text-align: left;">RFT1..91869. _ ITGAE..3682.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">SESTD1..91404. _ CCDC106..29903.</td>
+<td style="text-align: left;">C3orf62..375341. _ EML2..24139.</td>
+<td style="text-align: left;">ZNF471..57573. _ FUT10..84750.</td>
+<td style="text-align: left;">X4.pyridoxate _ alpha.glycerophosphate</td>
+<td style="text-align: left;">ZSCAN12..9753. _ UCHL1..7345.</td>
+<td style="text-align: left;">KLF11..8462. _ TFPT..29844.</td>
+<td style="text-align: left;">GPX8..493869. _ ABCA7..10347.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">ZNF286A..57335. _ OAZ1..4946.</td>
+<td style="text-align: left;">C3orf62..375341. _ PSTPIP2..9050.</td>
+<td style="text-align: left;">TOR4A..54863. _ APOC1..341.</td>
+<td style="text-align: left;">cytidine _ TEX2..55852.</td>
+<td style="text-align: left;">CBS..875. _ FXYD5..53827.</td>
+<td style="text-align: left;">MSRA..4482. _ PHKA1..5255.</td>
+<td style="text-align: left;">GPX8..493869. _ LIPE..3991.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ZNF418..147686. _ CCDC106..29903.</td>
+<td style="text-align: left;">TCEAL3..85012. _ ZCWPW1..55063.</td>
+<td style="text-align: left;">TOR4A..54863. _ SERPINB9..5272.</td>
+<td style="text-align: left;">cytidine _ X4.pyridoxate</td>
+<td style="text-align: left;">CBS..875. _ SLCO1B3..28234.</td>
+<td style="text-align: left;">MSRA..4482. _ NLRP1..22861.</td>
+<td style="text-align: left;">GPX8..493869. _ NOTCH1..4851.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">TVP23C.CDRT4..100533496. _ SAAL1..113174.</td>
+<td style="text-align: left;">TCEAL3..85012. _ CAPN5..726.</td>
+<td style="text-align: left;">TOR4A..54863. _ LRRC8E..80131.</td>
+<td style="text-align: left;">sorbitol _ cytidine</td>
+<td style="text-align: left;">THAP8..199745. _ ZSCAN12..9753.</td>
+<td style="text-align: left;">TMEM107..84314. _ GPX8..493869.</td>
+<td style="text-align: left;">SAAL1..113174. _ GLTP..51228.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">TVP23C.CDRT4..100533496. _ CDC26..246184.</td>
+<td style="text-align: left;">TCEAL3..85012. _ NNMT..4837.</td>
+<td style="text-align: left;">IRF9..10379. _ ZNF548..147694.</td>
+<td style="text-align: left;">thymine _ TEX2..55852.</td>
+<td style="text-align: left;">THAP8..199745. _ USP41..373856.</td>
+<td style="text-align: left;">KLHL28..54813. _ TFPT..29844.</td>
+<td style="text-align: left;">MYEOV..26579. _ GPX8..493869.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">dCMP _ OAZ1..4946.</td>
+<td style="text-align: left;">ZNF486..90649. _ ZCWPW1..55063.</td>
+<td style="text-align: left;">SH3D21..79729. _ TFAP2A..7020.</td>
+<td style="text-align: left;">thymine _ cytidine</td>
+<td style="text-align: left;">NXF1..10482. _ MRPL24..79590.</td>
+<td style="text-align: left;">ZNF829..374899. _ GALNT18..374378.</td>
+<td style="text-align: left;">TNFRSF10D..8793. _ ACCS..84680.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">hexoses..HILIC.neg. _ cytidine</td>
+<td style="text-align: left;">ZNF486..90649. _ CAPN5..726.</td>
+<td style="text-align: left;">SH3D21..79729. _ EIF2AK3..9451.</td>
+<td style="text-align: left;">taurodeoxycholate.taurochenodeoxycholate _ thymine</td>
+<td style="text-align: left;">MYEOV..26579. _ MACROH2A2..55506.</td>
+<td style="text-align: left;">ZNF829..374899. _ USP41..373856.</td>
+<td style="text-align: left;">CCDC106..29903. _ LAMA4..3910.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">lactate _ dCMP</td>
+<td style="text-align: left;">ZNF486..90649. _ THAP8..199745.</td>
+<td style="text-align: left;">cytidine _ EXOC1..55763.</td>
+<td style="text-align: left;">tryptophan _ X2.hydroxyglutarate</td>
+<td style="text-align: left;">MYEOV..26579. _ TIAM1..7074.</td>
+<td style="text-align: left;">SIPA1L1..26037. _ TFPT..29844.</td>
+<td style="text-align: left;">CCDC106..29903. _ TAPBPL..55080.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">choline _ homocysteine</td>
+<td style="text-align: left;">cytidine _ TAPBPL..55080.</td>
+<td style="text-align: left;">cytidine _ KLF11..8462.</td>
+<td style="text-align: left;">anthranilic.acid _ HNRNPM..4670.</td>
+<td style="text-align: left;">TNFRSF10D..8793. _ P2RX5..5026.</td>
+<td style="text-align: left;">SIPA1L1..26037. _ KLF11..8462.</td>
+<td style="text-align: left;">TMEM107..84314. _ GLTP..51228.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">acetylcholine _ ZNF286A..57335.</td>
+<td style="text-align: left;">cytidine _ CAPN5..726.</td>
+<td style="text-align: left;">uridine _ EIF2AK3..9451.</td>
+<td style="text-align: left;">anthranilic.acid _ glycine</td>
+<td style="text-align: left;">TNFRSF10D..8793. _ FXYD5..53827.</td>
+<td style="text-align: left;">RANBP17..64901. _ PHLDA1..22822.</td>
+<td style="text-align: left;">ZNF471..57573. _ DTNA..1837.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">acetylcholine _ TVP23C.CDRT4..100533496.</td>
+<td style="text-align: left;">urate _ F1P.F6P.G1P.G6P</td>
+<td style="text-align: left;">thiamine _ adipate</td>
+<td style="text-align: left;">thiamine _ thymine</td>
+<td style="text-align: left;">TNFRSF10D..8793. _ ECHDC2..55268.</td>
+<td style="text-align: left;">SH3D21..79729. _ GALNT18..374378.</td>
+<td style="text-align: left;">ZNF471..57573. _ UCHL1..7345.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">pipecolic.acid _ SYNE2..23224.</td>
+<td style="text-align: left;">X3.methyladipate.pimelate _ cytidine</td>
+<td style="text-align: left;">thiamine _ uridine</td>
+<td style="text-align: left;">adenosine _ FEM1A..55527.</td>
+<td style="text-align: left;">TNFRSF10D..8793. _ LRRC8C..84230.</td>
+<td style="text-align: left;">SH3D21..79729. _ NAAA..27163.</td>
+<td style="text-align: left;">CSF2RA..1438. _ GGACT..87769.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">pipecolic.acid _ PIGT..51604.</td>
+<td style="text-align: left;">tryptophan _ SAAL1..113174.</td>
+<td style="text-align: left;">C18.2.LPC _ uridine</td>
+<td style="text-align: left;">X2.deoxyadenosine _ tryptophan</td>
+<td style="text-align: left;">TMEM17..200728. _ RHOF..54509.</td>
+<td style="text-align: left;">SH3D21..79729. _ UCHL1..7345.</td>
+<td style="text-align: left;">APRT..353. _ ITGAE..3682.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">pipecolic.acid _ IGFLR1..79713.</td>
+<td style="text-align: left;">cis.trans.hydroxyproline _ tryptophan</td>
+<td style="text-align: left;">C18.2.LPC _ ornithine</td>
+<td style="text-align: left;">X2.deoxyadenosine _ anthranilic.acid</td>
+<td style="text-align: left;">ZNF471..57573. _ PLCB4..5332.</td>
+<td style="text-align: left;">SH3D21..79729. _ AUTS2..26053.</td>
+<td style="text-align: left;">S1PR3..1903. _ NHLRC1..378884.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">pipecolic.acid _ hexoses..HILIC.neg.</td>
+<td style="text-align: left;">pyroglutamic.acid _ uridine</td>
+<td style="text-align: left;">C18.2.LPC _ thiamine</td>
+<td style="text-align: left;">methionine.sulfoxide _ cotinine</td>
+<td style="text-align: left;">ZNF471..57573. _ WNT5B..81029.</td>
+<td style="text-align: left;">SH3D21..79729. _ KLF11..8462.</td>
+<td style="text-align: left;">PET117..100303755. _ THAP8..199745.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">pipecolic.acid _ taurodeoxycholate.taurochenodeoxycholate</td>
+<td style="text-align: left;">pyroglutamic.acid _ X3.methyladipate.pimelate</td>
+<td style="text-align: left;">C18.2.LPC _ anserine</td>
+<td style="text-align: left;">hexanoylcarnitine _ TRAPPC1..58485.</td>
+<td style="text-align: left;">ZNF471..57573. _ UCHL1..7345.</td>
+<td style="text-align: left;">C4orf48..401115. _ PHLDA1..22822.</td>
+<td style="text-align: left;">MAGEA2..4101. _ P2RX5..5026.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">pipecolic.acid _ choline</td>
+<td style="text-align: left;">X1.methylnicotinamide _ cytidine</td>
+<td style="text-align: left;">C16.0.LPE _ methionine.sulfoxide</td>
+<td style="text-align: left;">hexanoylcarnitine _ CDC26..246184.</td>
+<td style="text-align: left;">S1PR3..1903. _ ZSCAN12..9753.</td>
+<td style="text-align: left;">C4orf48..401115. _ LRRC8E..80131.</td>
+<td style="text-align: left;">cystathionine _ CDC26..246184.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">hexanoylcarnitine _ OAZ1..4946.</td>
+<td style="text-align: left;">valerylcarnitine.isovalerylcarnitine.2.methylbutyroylcarnitine _ GCSH..2653.</td>
+<td style="text-align: left;">C18.0.LPE _ methionine.sulfoxide</td>
+<td style="text-align: left;">beta.alanine _ TRAPPC1..58485.</td>
+<td style="text-align: left;">S1PR3..1903. _ ZNF382..84911.</td>
+<td style="text-align: left;">C8orf88..100127983. _ LY75..4065.</td>
+<td style="text-align: left;">cytidine _ adipate</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">hexanoylcarnitine _ CDC26..246184.</td>
+<td style="text-align: left;">valerylcarnitine.isovalerylcarnitine.2.methylbutyroylcarnitine _ PSTPIP2..9050.</td>
+<td style="text-align: left;">C32.0.PC _ ZFX..7543.</td>
+<td style="text-align: left;">C18.0.LPC _ X3.phosphoglycerate</td>
+<td style="text-align: left;">X3.phosphoglycerate _ MRPS2..51116.</td>
+<td style="text-align: left;">C8orf88..100127983. _ TFAP2A..7020.</td>
+<td style="text-align: left;">N.carbamoyl.beta.alanine _ phosphocreatine</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">hexanoylcarnitine _ N.carbamoyl.beta.alanine</td>
+<td style="text-align: left;">valerylcarnitine.isovalerylcarnitine.2.methylbutyroylcarnitine _ SAAL1..113174.</td>
+<td style="text-align: left;">C32.0.PC _ proline</td>
+<td style="text-align: left;">C18.0.LPC _ DHAP.glyceraldehyde.3P</td>
+<td style="text-align: left;">cytidine _ SERP1..27230.</td>
+<td style="text-align: left;">C8orf88..100127983. _ USP41..373856.</td>
+<td style="text-align: left;">thiamine _ cytidine</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">hexanoylcarnitine _ acetylcholine</td>
+<td style="text-align: left;">anserine _ X3.methyladipate.pimelate</td>
+<td style="text-align: left;">C32.0.PC _ methionine.sulfoxide</td>
+<td style="text-align: left;">C18.0.LPC _ beta.alanine</td>
+<td style="text-align: left;">uracil _ SERP1..27230.</td>
+<td style="text-align: left;">cystathionine _ CUL3..8452.</td>
+<td style="text-align: left;">choline _ cytidine</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C32.0.PC _ OAZ1..4946.</td>
+<td style="text-align: left;">C20.4.LPC _ RPL18..6141.</td>
+<td style="text-align: left;">C40.6.PC _ cytidine</td>
+<td style="text-align: left;">C18.0.LPE _ TRAPPC1..58485.</td>
+<td style="text-align: left;">phosphocreatine _ ATP6V1H..51606.</td>
+<td style="text-align: left;">cystathionine _ NEK2..4751.</td>
+<td style="text-align: left;">acetylcholine _ ITGA6..3655.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C34.4.PC _ PPDPF..79144.</td>
+<td style="text-align: left;">C20.4.LPC _ F1P.F6P.G1P.G6P</td>
+<td style="text-align: left;">C40.6.PC _ ornithine</td>
+<td style="text-align: left;">C18.0.LPE _ tryptophan</td>
+<td style="text-align: left;">phosphocreatine _ MRPS2..51116.</td>
+<td style="text-align: left;">cytidine _ GNL1..2794.</td>
+<td style="text-align: left;">acetylcholine _ FUT10..84750.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C34.4.PC _ X4.pyridoxate</td>
+<td style="text-align: left;">C18.0.LPE _ C20.4.LPC</td>
+<td style="text-align: left;">C40.6.PC _ thiamine</td>
+<td style="text-align: left;">C18.0.LPE _ methionine.sulfoxide</td>
+<td style="text-align: left;">phosphocreatine _ RHOF..54509.</td>
+<td style="text-align: left;">sorbitol _ cytidine</td>
+<td style="text-align: left;">acetylcholine _ CDC26..246184.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C34.4.PC _ hexoses..HILIC.neg.</td>
+<td style="text-align: left;">C38.6.PC _ X3.methyladipate.pimelate</td>
+<td style="text-align: left;">C18.1.SM _ C16.0.LPE</td>
+<td style="text-align: left;">C20.4.LPE _ allantoin</td>
+<td style="text-align: left;">phosphocreatine _ TCF25..22980.</td>
+<td style="text-align: left;">succinate.methylmalonate _ cytidine</td>
+<td style="text-align: left;">hexanoylcarnitine _ CDC26..246184.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C34.4.PC _ pyroglutamic.acid</td>
+<td style="text-align: left;">C38.6.PC _ pyroglutamic.acid</td>
+<td style="text-align: left;">C34.2.DAG _ ZFX..7543.</td>
+<td style="text-align: left;">C32.0.PC _ methionine.sulfoxide</td>
+<td style="text-align: left;">phosphocreatine _ NOSIP..51070.</td>
+<td style="text-align: left;">phosphocreatine _ CDYL..9425.</td>
+<td style="text-align: left;">anserine _ cytidine</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C36.1.DAG _ OAZ1..4946.</td>
+<td style="text-align: left;">C18.0.CE _ RPL18..6141.</td>
+<td style="text-align: left;">C34.2.DAG _ FUT10..84750.</td>
+<td style="text-align: left;">C34.4.PC _ X4.pyridoxate</td>
+<td style="text-align: left;">phosphocreatine _ TRAPPC2L..51693.</td>
+<td style="text-align: left;">phosphocreatine _ LRRC8E..80131.</td>
+<td style="text-align: left;">C18.0.LPE _ RPL18..6141.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C36.1.DAG _ hexanoylcarnitine</td>
+<td style="text-align: left;">C18.0.CE _ GCSH..2653.</td>
+<td style="text-align: left;">C18.0.CE _ PRDX3..10935.</td>
+<td style="text-align: left;">C34.4.PC _ allantoin</td>
+<td style="text-align: left;">asparagine _ TRAPPC2L..51693.</td>
+<td style="text-align: left;">niacinamide _ cytidine</td>
+<td style="text-align: left;">C18.0.LPE _ SEPHS1..22929.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C18.1.CE _ lactate</td>
+<td style="text-align: left;">C18.0.CE _ RFT1..91869.</td>
+<td style="text-align: left;">C18.0.CE _ proline</td>
+<td style="text-align: left;">C34.3.PC _ C18.0.LPC</td>
+<td style="text-align: left;">asparagine _ cystathionine</td>
+<td style="text-align: left;">arachidonyl_carnitine _ cytidine</td>
+<td style="text-align: left;">C34.4.PC _ adipate</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C18.0.CE _ OAZ1..4946.</td>
+<td style="text-align: left;">C18.0.CE _ tryptophan</td>
+<td style="text-align: left;">C18.0.CE _ methionine.sulfoxide</td>
+<td style="text-align: left;">C36.1.DAG _ X2.aminoadipate</td>
+<td style="text-align: left;">thiamine _ uracil</td>
+<td style="text-align: left;">arachidonyl_carnitine _ pyroglutamic.acid</td>
+<td style="text-align: left;">C40.6.PC _ cytidine</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">C18.0.CE _ hexanoylcarnitine</td>
+<td style="text-align: left;">C48.3.TAG _ CAPN5..726.</td>
+<td style="text-align: left;">C18.0.CE _ C18.0.LPE</td>
+<td style="text-align: left;">C36.1.DAG _ tryptophan</td>
+<td style="text-align: left;">niacinamide _ SERP1..27230.</td>
+<td style="text-align: left;">C18.0.LPE _ SEPHS1..22929.</td>
+<td style="text-align: left;">C18.0.CE _ RPL18..6141.</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">C54.6.TAG _ pyroglutamic.acid</td>
+<td style="text-align: left;">C48.3.TAG _ IRS1..3667.</td>
+<td style="text-align: left;">C46.2.TAG _ uridine</td>
+<td style="text-align: left;">C18.1.CE _ C18.0.LPE</td>
+<td style="text-align: left;">butyrylcarnitine.isobutyrylcarnitine _ MRPL24..79590.</td>
+<td style="text-align: left;">C18.0.LPE _ TBP..6908.</td>
+<td style="text-align: left;">C18.0.CE _ APRT..353.</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">NA</td>
+<td style="text-align: left;">C48.3.TAG _ C38.6.PC</td>
+<td style="text-align: left;">C56.2.TAG _ ELP4..26610.</td>
+<td style="text-align: left;">C18.0.CE _ X2.deoxyadenosine</td>
+<td style="text-align: left;">C36.1.PC _ X3.phosphoglycerate</td>
+<td style="text-align: left;">C32.0.PC _ CUL3..8452.</td>
+<td style="text-align: left;">C18.0.CE _ C18.0.LPE</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">NA</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: left;">C56.2.TAG _ glycine</td>
+<td style="text-align: left;">C18.0.CE _ cotinine</td>
+<td style="text-align: left;">C36.1.PC _ hexanoylcarnitine</td>
+<td style="text-align: left;">C32.0.PC _ FIBP..9158.</td>
+<td style="text-align: left;">C58.8.TAG _ cytidine</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">NA</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: left;">C56.2.TAG _ C16.0.LPE</td>
+<td style="text-align: left;">C18.0.CE _ hexanoylcarnitine</td>
+<td style="text-align: left;">C40.6.PC _ uracil</td>
+<td style="text-align: left;">C24.1.SM _ C18.0.LPE</td>
+<td style="text-align: left;">NA</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">NA</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: left;">C22.6.CE _ C18.0.LPE</td>
+<td style="text-align: left;">C18.0.CE _ C22.0.SM</td>
+<td style="text-align: left;">NA</td>
+<td style="text-align: left;">NA</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
